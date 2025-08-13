@@ -56,6 +56,9 @@
     "README.md",
     "LICENSE"
   ],
+  "dependencies": {
+    "jsdom": "^26.1.0"
+  },
   "devDependencies": {
     "@types/marked": "^5.0.2",
     "@types/micromatch": "^4.0.9",
