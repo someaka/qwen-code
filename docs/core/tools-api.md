@@ -43,6 +43,7 @@ The core comes with a suite of pre-defined tools, typically found in `packages/c
 - **Web Tools:**
   - `WebFetchTool` (`web-fetch.ts`): Fetches content from a URL.
   - `WebSearchTool` (`web-search.ts`): Performs a web search.
+  - `DuckDuckGoSearchTool` (`duckduckgo-search.ts`): Performs a web search using DuckDuckGo for enhanced privacy.
 - **Memory Tools:**
   - `MemoryTool` (`memoryTool.ts`): Interacts with the AI's memory.
 

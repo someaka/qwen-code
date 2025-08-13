@@ -47,6 +47,7 @@ Gemini CLI's built-in tools can be broadly categorized as follows:
 - **[Shell Tool](./shell.md) (`run_shell_command`):** For executing shell commands.
 - **[Web Fetch Tool](./web-fetch.md) (`web_fetch`):** For retrieving content from URLs.
 - **[Web Search Tool](./web-search.md) (`web_search`):** For searching the web.
+- **[DuckDuckGo Web Search Tool](./duckduckgo-web-search.md) (`duckduckgo_web_search`):** For searching the web with privacy-focused DuckDuckGo.
 - **[Multi-File Read Tool](./multi-file.md) (`read_many_files`):** A specialized tool for reading content from multiple files or directories, often used by the `@` command.
 - **[Memory Tool](./memory.md) (`save_memory`):** For saving and recalling information across sessions.
 
