@@ -49,6 +49,8 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
+import { logIdeConnection } from '../telemetry/loggers.js';
+import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -131,7 +133,7 @@ export class MCPServerConfig {
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
     readonly authProviderType?: AuthProviderType,
-  ) {}
+  ) { }
 }
 
 export enum AuthProviderType {
@@ -197,7 +199,6 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   ideModeFeature?: boolean;
   ideMode?: boolean;
-  ideClient?: IdeClient;
   enableOpenAILogging?: boolean;
   sampling_params?: Record<string, unknown>;
   systemPromptMappings?: Array<{
@@ -210,6 +211,9 @@ export interface ConfigParameters {
     maxRetries?: number;
   };
   cliVersion?: string;
+  loadMemoryFromIncludeDirectories?: boolean;
+  // Web search providers
+  tavilyApiKey?: string;
 }
 
 export class Config {
@@ -284,6 +288,9 @@ export class Config {
     maxRetries?: number;
   };
   private readonly cliVersion?: string;
+  private readonly loadMemoryFromIncludeDirectories: boolean = false;
+  private readonly tavilyApiKey?: string;
+
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.embeddingModel =
@@ -346,14 +353,22 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.ideModeFeature = params.ideModeFeature ?? false;
     this.ideMode = params.ideMode ?? false;
-    this.ideClient =
-      params.ideClient ??
-      IdeClient.getInstance(this.ideMode && this.ideModeFeature);
+    this.ideClient = IdeClient.getInstance();
+    if (this.ideMode && this.ideModeFeature) {
+      this.ideClient.connect();
+      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
+    }
     this.systemPromptMappings = params.systemPromptMappings;
     this.enableOpenAILogging = params.enableOpenAILogging ?? false;
     this.sampling_params = params.sampling_params;
     this.contentGenerator = params.contentGenerator;
     this.cliVersion = params.cliVersion;
+
+    this.loadMemoryFromIncludeDirectories =
+      params.loadMemoryFromIncludeDirectories ?? false;
+
+    // Web search
+    this.tavilyApiKey = params.tavilyApiKey;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -414,6 +429,10 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
+  }
+
+  shouldLoadMemoryFromIncludeDirectories(): boolean {
+    return this.loadMemoryFromIncludeDirectories;
   }
 
   getContentGeneratorConfig(): ContentGeneratorConfig {
@@ -683,6 +702,11 @@ export class Config {
     return this.summarizeToolOutput;
   }
 
+  // Web search provider configuration
+  getTavilyApiKey(): string | undefined {
+    return this.tavilyApiKey;
+  }
+
   getIdeModeFeature(): boolean {
     return this.ideModeFeature;
   }
@@ -699,12 +723,14 @@ export class Config {
     this.ideMode = value;
   }
 
-  setIdeClientDisconnected(): void {
-    this.ideClient.setDisconnected();
-  }
-
-  setIdeClientConnected(): void {
-    this.ideClient.reconnect(this.ideMode && this.ideModeFeature);
+  async setIdeModeAndSyncConnection(value: boolean): Promise<void> {
+    this.ideMode = value;
+    if (value) {
+      await this.ideClient.connect();
+      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.SESSION));
+    } else {
+      this.ideClient.disconnect();
+    }
   }
 
   getEnableOpenAILogging(): boolean {
@@ -729,10 +755,10 @@ export class Config {
 
   getSystemPromptMappings():
     | Array<{
-        baseUrls?: string[];
-        modelNames?: string[];
-        template?: string;
-      }>
+      baseUrls?: string[];
+      modelNames?: string[];
+      template?: string;
+    }>
     | undefined {
     return this.systemPromptMappings;
   }
@@ -791,8 +817,10 @@ export class Config {
     registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
-    registerCoreTool(WebSearchTool, this);
-    registerCoreTool(DuckDuckGoSearchTool, this);
+    // Conditionally register web search tool only if Tavily API key is set
+    if (this.getTavilyApiKey()) {
+      registerCoreTool(WebSearchTool, this);
+    }
 
     await registry.discoverAllTools();
     return registry;
